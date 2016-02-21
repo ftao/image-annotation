@@ -137,6 +137,7 @@ toPoints address model =
        , makePointShape left bottom BottomLeft
        ]
         
+init : (Model, Effects.Effects Action)
 init = 
     ( { p1 = {x = 100, y = 100}
       , p2 = {x = 300, y = 200}
