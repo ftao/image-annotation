@@ -128,8 +128,8 @@ update action model =
 
 view : Signal.Address Action -> Model -> Html.Html
 view address model =
-  svg
-    [ width "400", height "400", viewBox "0 0 400 400" ]
+  g
+    []
     ([ (toRect address model) ]
       ++ (if model.isEditing then
             (toPoints address model)

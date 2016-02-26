@@ -32,6 +32,7 @@ type alias Model =
 
 type Action
   = SelectTool AnnotationTool
+  | UnSelectTool
 
 
 update : Action -> Model -> ( Model, Effects.Effects Action )
@@ -41,7 +42,10 @@ update action model =
       ( { model | selected = Just tool }
       , Effects.none
       )
-
+    UnSelectTool ->
+      ( { model | selected = Nothing }
+      , Effects.none
+      )
 
 
 -- VIEW

@@ -10,6 +10,7 @@ import Svg.Attributes exposing (viewBox, width, height, xlinkHref)
 import Element exposing (Point)
 import Box
 import Toolbar exposing (AnnotationTool(..))
+import Array
 
 
 -- MODEL
@@ -24,17 +25,20 @@ type alias Model =
   , width : Int
   , height : Int
   , toolbar : Toolbar.Model
-  , annotations : List Annotation
+  , annotations : Array.Array Annotation
+  , nextId : Int
   }
 
 
+setAnnotation index ann model =
+    { model | annotations = (Array.set index ann model.annotations) }
 
 -- UPDATE
 
 
 type Action
   = Tool Toolbar.Action
-  | SubBoxMsg Box.Action
+  | SubBoxMsg Int Box.Action
   | AddAnnotation
   | DragTo Point
   | StopDrag
@@ -52,41 +56,80 @@ update action model =
         , Effects.map Tool toolbarFx
         )
 
-    SubBoxMsg action ->
-      ( model, Effects.none )
-
-    DragTo point ->
-      ( model, Effects.none )
-
-    StopDrag ->
-      ( model, Effects.none )
+    SubBoxMsg index action ->
+      let
+        aModel = Array.get index model.annotations
+      in
+        case aModel of
+             Just annotation -> 
+                case annotation of 
+                    AnnoBox boxModel -> 
+                         let 
+                            (newBox, boxFx) = Box.update action boxModel
+                         in
+                            ( setAnnotation index (AnnoBox newBox) model
+                            , Effects.map (SubBoxMsg index) boxFx
+                            )
+                    --_ -> 
+                    --    (model, Effects.none)
+             Nothing -> 
+                 (model, Effects.none)
 
     AddAnnotation ->
-      {-
-      ( { model |
-          annotations = (model.annotations ++ [(newAnnotation AnnotationBox)])
-          }
-      , Effects.none)
-      -}
       case model.toolbar.selected of
         Just x ->
-          ( { model
-              | annotations = (model.annotations ++ [ (newAnnotation x) ])
-            }
-          , Effects.none
-          )
-
+          let 
+            (toolbar, fx) = Toolbar.update Toolbar.UnSelectTool model.toolbar
+          in
+            ( { model
+                | annotations = Array.push (newAnnotation x) model.annotations 
+                , nextId = (model.nextId + 1)
+                , toolbar = toolbar
+                }
+            , Effects.none
+            )
         Nothing ->
           ( model, Effects.none )
 
+    DragTo point ->
+        forwardBoxAction (Box.DragTo point) model
+    StopDrag -> 
+        forwardBoxAction Box.StopDrag model
+
+forwardBoxAction : Box.Action -> Model -> ( Model, Effects.Effects Action )
+forwardBoxAction action model = 
+    let 
+        applyUpdate : (Int, Annotation) -> 
+            {index : Int, model : Annotation, fx : Effects.Effects Action}
+        applyUpdate (index, annotation) = 
+            case annotation of 
+                AnnoBox boxModel -> 
+                    let 
+                        (newModel, fx) = Box.update action boxModel
+                    in 
+                        { index = index
+                        , model = AnnoBox newModel
+                        , fx = Effects.map (SubBoxMsg index) fx
+                        }
+        updateResult = model.annotations 
+            |> Array.toIndexedList
+            |> List.map applyUpdate
+        annotations = updateResult
+            |> List.map .model
+            |> Array.fromList
+        effects = updateResult 
+            |> List.map .fx
+            |> Effects.batch
+    in
+        ( { model | annotations = annotations }
+        , effects 
+        )
 
 newAnnotation : Toolbar.AnnotationTool -> Annotation
 newAnnotation tool =
   case tool of
     AnnotationBox ->
       AnnoBox Box.default
-
-
 
 -- VIEW
 
@@ -105,6 +148,10 @@ view address model =
         (Signal.forwardTo address Tool)
         model.toolbar
 
+    annotations = model.annotations
+       |> Array.toIndexedList
+       |> List.map (renderAnnotation address)
+
     canvas =
       svg
         [ width w
@@ -113,23 +160,26 @@ view address model =
         , onClick (Signal.message address AddAnnotation)
         ]
         ([ image
-            [ xlinkHref model.image, width w, height h ]
+            [ xlinkHref model.image, width w, height h 
+            ]
             []
-         ]
-          ++ (List.map (renderAnnotation address) model.annotations)
+         ] ++ annotations
         )
   in
     Html.div
       []
-      [ toolbar, canvas ]
+      [ toolbar
+      , canvas 
+      , Html.pre [] [text (toString model)]
+      ]
 
 
-renderAnnotation : Signal.Address Action -> Annotation -> Html.Html
-renderAnnotation address annotation =
+renderAnnotation : Signal.Address Action -> (Int, Annotation) -> Html.Html
+renderAnnotation address (index, annotation) =
   case annotation of
     AnnoBox box ->
       Box.view
-        (Signal.forwardTo address SubBoxMsg)
+        (Signal.forwardTo address (SubBoxMsg index))
         box
 
 
@@ -143,7 +193,8 @@ init =
       , width = 650
       , height = 375
       , toolbar = toolModel
-      , annotations = []
+      , annotations = Array.empty
+      , nextId = 0
       }
     , Effects.map Tool toolFx
     )
