@@ -1,13 +1,13 @@
 module Box (..) where
 
-import Debug
+import Maybe exposing (..)
 import Mouse
 import Html
 
 
 --import Json.Decode as Json exposing((:=))
 
-import Maybe exposing (Maybe(Just, Nothing))
+import Maybe exposing (Maybe(Just, Nothing), withDefault)
 import Color exposing (..)
 import Svg exposing (..)
 import Svg.Attributes exposing (viewBox, width, height, r, cx, cy, x, y, rx, ry, stroke, strokeWidth, fill)
@@ -117,9 +117,12 @@ update action model =
       )
 
     DragTo point ->
-      ( resize model model.currentPoint point
-      , Effects.none
-      )
+      if model.isEditing then
+        ( resize model model.currentPoint point
+        , Effects.none
+        )
+      else
+        ( model, Effects.none )
 
 
 
@@ -164,8 +167,8 @@ toRect address model =
       , rx "5"
       , ry "5"
       , stroke "black"
-      , strokeWidth "1"
-      , fill "white"
+      , strokeWidth "2"
+      , fill "transparent"
       , onClick (Signal.message address Select)
       ]
       []
@@ -215,9 +218,22 @@ init =
   )
 
 
-default =
-  { p1 = { x = 100, y = 100 }
-  , p2 = { x = 300, y = 200 }
-  , isEditing = False
-  , currentPoint = None
-  }
+defaultWidth =
+  1.0
+
+
+defaultHeight =
+  1.0
+
+
+withStartPoint : Maybe Point -> Model
+withStartPoint point =
+  let
+    p =
+      withDefault (Point 100 100) point
+  in
+    { p1 = p
+    , p2 = Point (p.x + defaultWidth) (p.y + defaultHeight)
+    , isEditing = True
+    , currentPoint = BottomRight
+    }

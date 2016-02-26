@@ -14,10 +14,7 @@ import Box
 
 type AnnotationTool
   = AnnotationBox
-
-
-
---   | AnnotationBlur
+  | AnnotationMosaic
 
 
 type alias Model =
@@ -42,10 +39,12 @@ update action model =
       ( { model | selected = Just tool }
       , Effects.none
       )
+
     UnSelectTool ->
       ( { model | selected = Nothing }
       , Effects.none
       )
+
 
 
 -- VIEW
@@ -76,7 +75,7 @@ init : ( Model, Effects.Effects Action )
 init =
   ( { tools =
         [ AnnotationBox
-          --, AnnotationBlur
+        , AnnotationMosaic
         ]
     , selected = Nothing
     }

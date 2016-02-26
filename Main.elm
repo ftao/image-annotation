@@ -16,7 +16,7 @@ app =
     { init = init
     , update = update
     , view = view
-    , inputs = [ mouseEvents ]
+    , inputs = [ mouseMoveEvents, mouseStateEvents ]
     }
 
 
@@ -26,14 +26,23 @@ main =
 
 mergeMouseEvent : ( Int, Int ) -> Bool -> Action
 mergeMouseEvent pos isDown =
+  MouseMove isDown { x = toFloat (fst pos), y = toFloat (snd pos) }
+
+
+makeMouseStateEvent : Bool -> Action
+makeMouseStateEvent isDown =
   if isDown then
-    DragTo { x = toFloat (fst pos), y = toFloat (snd pos) }
+    StartDrag
   else
     StopDrag
 
 
-mouseEvents =
+mouseMoveEvents =
   Signal.map2 mergeMouseEvent Mouse.position Mouse.isDown
+
+
+mouseStateEvents =
+  Signal.map makeMouseStateEvent Mouse.isDown
 
 
 port tasks : Signal (Task.Task Never ())
