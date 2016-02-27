@@ -114,21 +114,23 @@ toRect address model filterName =
       []
 
 
-defaultWidth =
-  1.0
+
+-- Init
 
 
-defaultHeight =
-  1.0
-
-
-withStartPoint : Maybe Point -> Model
-withStartPoint point =
+init : Point -> ( Model, Effects.Effects Action )
+init p =
   let
-    p =
-      withDefault (Point 100 100) point
+    defaultWidth =
+      1.0
+
+    defaultHeight =
+      1.0
+
+    model =
+      { p1 = p
+      , p2 = Point (p.x + defaultWidth) (p.y + defaultHeight)
+      , isEditing = True
+      }
   in
-    { p1 = p
-    , p2 = Point (p.x + defaultWidth) (p.y + defaultHeight)
-    , isEditing = True
-    }
+    ( model, Effects.none )

@@ -3,10 +3,6 @@ module Box (..) where
 import Maybe exposing (..)
 import Mouse
 import Html
-
-
---import Json.Decode as Json exposing((:=))
-
 import Maybe exposing (Maybe(Just, Nothing), withDefault)
 import Color exposing (..)
 import Svg exposing (..)
@@ -48,10 +44,6 @@ type Action
   | SelectPoint Position
   | StopDrag
   | DragTo Point
-
-
-
---    | MovePoint Position Point
 
 
 resize : Model -> Position -> Point -> Model
@@ -207,33 +199,24 @@ toPoints address model =
     ]
 
 
-init : ( Model, Effects.Effects Action )
-init =
-  ( { p1 = { x = 100, y = 100 }
-    , p2 = { x = 300, y = 200 }
-    , isEditing = False
-    , currentPoint = None
-    }
-  , Effects.none
-  )
+
+-- Init
 
 
-defaultWidth =
-  1.0
-
-
-defaultHeight =
-  1.0
-
-
-withStartPoint : Maybe Point -> Model
-withStartPoint point =
+init : Point -> ( Model, Effects.Effects Action )
+init p =
   let
-    p =
-      withDefault (Point 100 100) point
+    defaultWidth =
+      1.0
+
+    defaultHeight =
+      1.0
+
+    model =
+      { p1 = p
+      , p2 = Point (p.x + defaultWidth) (p.y + defaultHeight)
+      , isEditing = True
+      , currentPoint = BottomRight
+      }
   in
-    { p1 = p
-    , p2 = Point (p.x + defaultWidth) (p.y + defaultHeight)
-    , isEditing = True
-    , currentPoint = BottomRight
-    }
+    ( model, Effects.none )

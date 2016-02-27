@@ -77,32 +77,36 @@ update action model =
         case aModel of
           Just annotation ->
             let
-              result =
+              ( newModel, fx ) =
                 applyUpdate act ( index, annotation )
             in
-              ( setAnnotation index result.model model
-              , result.fx
+              ( setAnnotation index newModel model
+              , fx
               )
 
           Nothing ->
             ( model, Effects.none )
 
     AddAnnotation ->
-      case model.toolbar.selected of
-        Just x ->
-          let
-            ( toolbar, fx ) =
-              Toolbar.update Toolbar.UnSelectTool model.toolbar
-          in
-            ( { model
-                | annotations = Array.push (newAnnotation x model.mousePosition) model.annotations
-                , nextId = (model.nextId + 1)
-                , toolbar = toolbar
-              }
-            , Effects.none
-            )
+      case model.mousePosition of
+        Just point ->
+          case model.toolbar.selected of
+            Just tool ->
+              let
+                ( annotation, fx ) =
+                  (newAnnotation model.nextId tool point)
+              in
+                ( { model
+                    | annotations = Array.push annotation model.annotations
+                    , nextId = (model.nextId + 1)
+                  }
+                , fx
+                )
 
-        Nothing ->
+            _ ->
+              ( model, Effects.none )
+
+        _ ->
           ( model, Effects.none )
 
     MouseMove isDown point ->
@@ -125,44 +129,26 @@ update action model =
       ( model, Effects.none )
 
 
-applyUpdate : SubAct -> ( Int, Annotation ) -> { index : Int, model : Annotation, fx : Effects.Effects Action }
+applyUpdate : SubAct -> ( Int, Annotation ) -> ( Annotation, Effects.Effects Action )
 applyUpdate act ( index, annotation ) =
   case annotation of
     AnnoBox model ->
       case act of
-        BoxAct boxAct ->
-          let
-            ( newModel, fx ) =
-              Box.update boxAct model
-          in
-            { index = index
-            , model = AnnoBox newModel
-            , fx = Effects.map (\x -> (SubMsg index (BoxAct x))) fx
-            }
+        BoxAct subAct ->
+          Box.update subAct model
+            |> mapUpdateResult AnnoBox BoxAct index
 
         _ ->
-          { index = index
-          , model = annotation
-          , fx = Effects.none
-          }
+          ( annotation, Effects.none )
 
-    AnnoMosaic mosaicModel ->
+    AnnoMosaic model ->
       case act of
-        MosaicAct mosaicAct ->
-          let
-            ( newModel, fx ) =
-              Mosaic.update mosaicAct mosaicModel
-          in
-            { index = index
-            , model = AnnoMosaic newModel
-            , fx = Effects.map (\x -> (SubMsg index (MosaicAct x))) fx
-            }
+        MosaicAct subAct ->
+          Mosaic.update subAct model
+            |> mapUpdateResult AnnoMosaic MosaicAct index
 
         _ ->
-          { index = index
-          , model = annotation
-          , fx = Effects.none
-          }
+          ( annotation, Effects.none )
 
 
 translateAct : Annotation -> Action -> SubAct
@@ -194,16 +180,16 @@ forwardAction action model =
     updateResult =
       model.annotations
         |> Array.toIndexedList
-        |> List.map (\x -> applyUpdate (translateAct (snd x) action) x)
+        |> List.map (\x -> (applyUpdate (translateAct (snd x) action)) x)
 
     annotations =
       updateResult
-        |> List.map .model
+        |> List.map fst
         |> Array.fromList
 
     effects =
       updateResult
-        |> List.map .fx
+        |> List.map snd
         |> Effects.batch
   in
     ( { model | annotations = annotations }
@@ -211,14 +197,23 @@ forwardAction action model =
     )
 
 
-newAnnotation : Toolbar.AnnotationTool -> Maybe Point -> Annotation
-newAnnotation tool point =
+mapUpdateResult : (a -> Annotation) -> (b -> SubAct) -> Int -> ( a, Effects.Effects b ) -> ( Annotation, Effects.Effects Action )
+mapUpdateResult func1 func2 index ( m, fx ) =
+  ( func1 m
+  , Effects.map (\x -> SubMsg index (func2 x)) fx
+  )
+
+
+newAnnotation : Int -> Toolbar.AnnotationTool -> Point -> ( Annotation, Effects.Effects Action )
+newAnnotation index tool point =
   case tool of
     AnnotationBox ->
-      AnnoBox (Box.withStartPoint point)
+      Box.init point
+        |> mapUpdateResult AnnoBox BoxAct index
 
     AnnotationMosaic ->
-      AnnoMosaic (Mosaic.withStartPoint point)
+      Mosaic.init point
+        |> mapUpdateResult AnnoMosaic MosaicAct index
 
 
 
