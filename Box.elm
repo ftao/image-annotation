@@ -15,11 +15,15 @@ import Style exposing (Style)
 
 -- MODEL
 
+type State
+  = Creating 
+  | Editing
+  | Normal
 
 type alias Model =
   { p1 : Point
   , p2 : Point
-  , isEditing : Bool
+  , state : State
   , currentPoint :
       Position
       --, style : Style
@@ -89,12 +93,15 @@ update : Action -> Model -> ( Model, Effects.Effects Action )
 update action model =
   case action of
     Select ->
-      ( { model | isEditing = True }
+      ( { model | state = Editing }
       , Effects.none
       )
 
     UnSelect ->
-      ( { model | isEditing = False }
+      ( { model 
+            | state = Normal 
+            , currentPoint = None
+        }
       , Effects.none
       )
 
@@ -104,18 +111,33 @@ update action model =
       )
 
     StopDrag ->
-      ( { model | currentPoint = None }
-      , Effects.none
-      )
+      case model.state of 
+        Creating -> 
+          ( { model 
+                | state = Normal 
+                , currentPoint = None 
+            }
+          , Effects.none
+          )
+        Editing -> 
+          ( { model | currentPoint = None }
+          , Effects.none
+          )
+        Normal -> 
+          ( model, Effects.none)
 
     DragTo point ->
-      if model.isEditing then
-        ( resize model model.currentPoint point
-        , Effects.none
-        )
-      else
-        ( model, Effects.none )
-
+      case model.state of 
+        Creating -> 
+          ( resize model BottomRight point
+          , Effects.none
+          )
+        Editing -> 
+          ( resize model model.currentPoint point
+          , Effects.none
+          )
+        Normal -> 
+          ( model, Effects.none )
 
 
 -- VIEW
@@ -124,9 +146,10 @@ update action model =
 view : Signal.Address Action -> Model -> Html.Html
 view address model =
   g
-    []
+    [ onMouseUp (Signal.message address StopDrag)
+    ]
     ([ (toRect address model) ]
-      ++ (if model.isEditing then
+      ++ (if model.state == Editing then
             (toPoints address model)
           else
             []
@@ -148,8 +171,6 @@ toRect address model =
     minY =
       min model.p1.y model.p2.y
 
-    --outlineStyle =
-    --    if model.isEditing then {style | color = blue } else style
   in
     rect
       [ x (toString minX)
@@ -215,8 +236,8 @@ init p =
     model =
       { p1 = p
       , p2 = Point (p.x + defaultWidth) (p.y + defaultHeight)
-      , isEditing = True
-      , currentPoint = BottomRight
+      , state = Creating
+      , currentPoint = None
       }
   in
     ( model, Effects.none )

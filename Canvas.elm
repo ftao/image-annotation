@@ -51,6 +51,7 @@ type Action
   = Tool Toolbar.Action
   | SubMsg Int SubAct
   | AddAnnotation
+  | Select
   | MouseMove Bool Point
   | StartDrag
   | DragTo Point
@@ -119,6 +120,9 @@ update action model =
         else
           ( model, Effects.none )
 
+    Select -> 
+      forwardAction action model
+
     DragTo point ->
       forwardAction action model
 
@@ -169,6 +173,14 @@ translateAct annotation action =
 
         AnnoMosaic _ ->
           MosaicAct Mosaic.StopDrag
+
+    Select -> 
+      case annotation of
+        AnnoBox _ ->
+          BoxAct Box.UnSelect
+
+        AnnoMosaic _ ->
+          NoAct
 
     _ ->
       NoAct
@@ -244,13 +256,14 @@ view address model =
         [ width w
         , height h
         , viewBox ("0 0 " ++ w ++ " " ++ h)
-        , onMouseDown (Signal.message address AddAnnotation)
-        , onMouseUp (Signal.message address StopDrag)
         ]
         ([ image
             [ xlinkHref model.image
             , width w
             , height h
+            , onMouseDown (Signal.message address AddAnnotation)
+            , onMouseUp (Signal.message address StopDrag)
+            , onClick (Signal.message address Select)
             ]
             []
          ]
