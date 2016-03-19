@@ -1,6 +1,8 @@
 module Canvas (..) where
 
 import Debug
+import Mouse
+import Signal
 import Maybe exposing (Maybe(Just, Nothing))
 import Effects exposing (Effects)
 import Html
@@ -56,6 +58,7 @@ type Action
   | StartDrag
   | DragTo Point
   | StopDrag
+  | NoAction
 
 
 update : Action -> Model -> ( Model, Effects.Effects Action )
@@ -132,6 +135,8 @@ update action model =
     StartDrag ->
       ( model, Effects.none )
 
+    NoAction ->
+      ( model, Effects.none )
 
 applyUpdate : SubAct -> ( Int, Annotation ) -> ( Annotation, Effects.Effects Action )
 applyUpdate act ( index, annotation ) =
@@ -235,6 +240,7 @@ newAnnotation index tool point =
 view : Signal.Address Action -> Model -> Html.Html
 view address model =
   let
+
     w =
       toString model.width
 
@@ -308,3 +314,38 @@ init =
       }
     , Effects.map Tool toolFx
     )
+
+
+-- Utils
+
+makeMouseMoveAction : ( Int, Int ) -> Bool -> Action
+makeMouseMoveAction pos isDown =
+  MouseMove isDown { x = toFloat (fst pos), y = toFloat (snd pos) }
+
+makeMouseStateAction : Bool -> Action
+makeMouseStateAction isDown =
+  if isDown then
+    StartDrag
+  else
+    StopDrag
+
+
+makeInputs = 
+  [ Signal.map2 makeMouseMoveAction Mouse.position Mouse.isDown
+  , Signal.map makeMouseStateAction Mouse.isDown
+  ]
+
+shouldRedoable: Action -> Bool
+shouldRedoable action = 
+  case action of 
+    AddAnnotation ->
+      True
+    Select ->
+      True
+    _ ->
+      False
+
+
+--port tasks : Signal (Task.Task Never ())
+--port tasks =
+--  app.tasks
