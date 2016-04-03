@@ -1,23 +1,18 @@
 module Mosaic (..) where
-
 import Mouse
 import Html
-
-
---import Json.Decode as Json exposing((:=))
-
 import Maybe exposing (Maybe(Just, Nothing), withDefault)
 import Color exposing (..)
 import Svg exposing (..)
 import Svg.Attributes exposing (id, viewBox, width, height, r, in', stdDeviation, cx, cy, x, y, rx, ry, stroke, strokeWidth, fill)
 import Svg.Events exposing (onClick, onMouseDown, onMouseUp, onMouseMove)
 import Effects exposing (Effects)
-import Element exposing (Point)
+import Element exposing (Point, pointDecoder, encodePoint)
 import Style exposing (Style)
-
+import Json.Decode exposing (..)
+import Json.Encode
 
 -- MODEL
-
 
 type alias Model =
   { p1 : Point
@@ -27,6 +22,19 @@ type alias Model =
       --, style : Style
   }
 
+
+modelDecoder = 
+  Json.Decode.object2 (\p1 p2 -> Model p1 p2 False)
+    ("p1" := pointDecoder)
+    ("p2" := pointDecoder)
+
+
+encodeModel tag model = 
+  Json.Encode.object 
+    [ ("tag", Json.Encode.string tag)
+    , ("p1", encodePoint model.p1)
+    , ("p2", encodePoint model.p2)
+    ]
 
 
 -- UPDATE

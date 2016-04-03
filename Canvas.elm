@@ -3,17 +3,24 @@ module Canvas (..) where
 import Debug
 import Mouse
 import Signal
+import Task
+import Array
 import Maybe exposing (Maybe(Just, Nothing))
 import Effects exposing (Effects)
 import Html
 import Svg exposing (..)
 import Svg.Events exposing (onClick, onMouseDown, onMouseUp)
 import Svg.Attributes exposing (viewBox, width, height, xlinkHref)
+import Json.Decode exposing (..)
+import Json.Encode
+
 import Element exposing (Point)
 import Box
 import Mosaic
 import Toolbar exposing (AnnotationTool(..))
-import Array
+
+import Native.ImageAnnotation
+
 
 
 -- MODEL
@@ -32,12 +39,55 @@ type alias Model =
   , annotations : Array.Array Annotation
   , nextId : Int
   , mousePosition : Maybe Point
+  , version: Int
+  , savedVersion: Int
   }
 
 
+encodeAnnotation anno = 
+  case anno of 
+    AnnoBox x ->
+      Box.encodeModel "box" x
+    AnnoMosaic x ->
+      Mosaic.encodeModel "mosaic" x
+
+annotationDecoder: Decoder Annotation
+annotationDecoder =
+  ("tag" := string) `andThen` annotationInfo
+  
+annotationInfo: String -> Decoder Annotation
+annotationInfo tag = 
+  case tag of 
+    "box" ->
+      Json.Decode.map AnnoBox Box.modelDecoder
+    "mosaic" ->
+      Json.Decode.map AnnoMosaic Mosaic.modelDecoder
+    _ -> 
+      fail (tag ++ " is not a recognized tag for annotation")
+
+encodeModel model = 
+  Json.Encode.object 
+    [ ("image", Json.Encode.string model.image)
+    , ("width", Json.Encode.int model.width)
+    , ("height", Json.Encode.int model.height)
+    , ("annotations", 
+        model.annotations 
+          |> Array.map encodeAnnotation 
+          |> Json.Encode.array 
+      )
+    ]
+
+modelDecoder model = 
+  Json.Decode.object4
+    (\a b c d -> {model | image = a, width = b, height = c, annotations = d})
+    ("image" := string)
+    ("width" := int)
+    ("height" := int)
+    ("annotations" := array annotationDecoder)
+    
+
 setAnnotation index ann model =
   { model | annotations = (Array.set index ann model.annotations) }
-
 
 
 -- UPDATE
@@ -58,6 +108,10 @@ type Action
   | StartDrag
   | DragTo Point
   | StopDrag
+  | Load
+  | LoadDone Model
+  | Save
+  | SaveDone Int
   | NoAction
 
 
@@ -134,6 +188,23 @@ update action model =
 
     StartDrag ->
       ( model, Effects.none )
+
+    Save -> 
+      ( model
+      , save model
+      )
+    Load -> 
+      ( model
+      , load model
+      )
+    SaveDone version ->
+      ( { model 
+          | savedVersion = version
+        }
+      , Effects.none
+      )
+    LoadDone loadedModel -> 
+      (loadedModel, Effects.none)
 
     NoAction ->
       ( model, Effects.none )
@@ -281,6 +352,12 @@ view address model =
       [ toolbar
       , canvas
       , Html.pre [] [ text (toString model) ]
+      , Html.button 
+         [ onClick (Signal.message address Save) ]
+         [ text "Save"]
+      , Html.button 
+         [ onClick (Signal.message address Load) ]
+         [ text "Load"]
       ]
 
 
@@ -311,6 +388,8 @@ init =
       , annotations = Array.empty
       , nextId = 0
       , mousePosition = Nothing
+      , version = 0
+      , savedVersion = 0
       }
     , Effects.map Tool toolFx
     )
@@ -346,6 +425,34 @@ shouldRedoable action =
       False
 
 
---port tasks : Signal (Task.Task Never ())
---port tasks =
---  app.tasks
+-- EFFECTS
+
+save : Model -> Effects Action
+save model = 
+  let 
+    result = encodeModel model
+      |> Json.Encode.encode 2 
+      |> Debug.log "save data"
+  in
+    Native.ImageAnnotation.save result
+      |> Task.succeed 
+      |> Task.map (\x -> SaveDone model.version)
+      |> Effects.task
+
+
+load : Model -> Effects Action
+load model = 
+  let 
+    decodeLoadResult x = 
+      let
+        result = decodeString (modelDecoder model) x
+      in 
+        case result of
+          Ok value ->
+            LoadDone value
+          Err err -> 
+            NoAction
+  in 
+    Native.ImageAnnotation.load "state"
+      |> Task.map decodeLoadResult
+      |> Effects.task

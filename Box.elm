@@ -9,8 +9,10 @@ import Svg exposing (..)
 import Svg.Attributes exposing (viewBox, width, height, r, cx, cy, x, y, rx, ry, stroke, strokeWidth, fill)
 import Svg.Events exposing (onClick, onMouseDown, onMouseUp, onMouseMove)
 import Effects exposing (Effects)
-import Element exposing (Point)
+import Element exposing (Point, pointDecoder, encodePoint)
 import Style exposing (Style)
+import Json.Decode exposing (..)
+import Json.Encode
 
 
 -- MODEL
@@ -37,6 +39,19 @@ type Position
   | BottomLeft
   | BottomRight
 
+
+modelDecoder = 
+  object2 (\p1 p2 -> Model p1 p2 Normal None)
+    ("p1" := pointDecoder)
+    ("p2" := pointDecoder)
+
+
+encodeModel tag model = 
+  Json.Encode.object 
+    [ ("tag", Json.Encode.string tag)
+    , ("p1", encodePoint model.p1)
+    , ("p2", encodePoint model.p2)
+    ]
 
 
 -- UPDATE
