@@ -1,6 +1,5 @@
 module Canvas (..) where
 
-import Debug
 import Mouse
 import Signal
 import Task
@@ -18,9 +17,7 @@ import Element exposing (Point)
 import Box
 import Mosaic
 import Toolbar exposing (AnnotationTool(..))
-
-import Native.ImageAnnotation
-
+import Storage
 
 
 -- MODEL
@@ -434,7 +431,7 @@ save model =
       |> Json.Encode.encode 2 
       |> Debug.log "save data"
   in
-    Native.ImageAnnotation.save result
+    Storage.save ("state", result)
       |> Task.succeed 
       |> Task.map (\x -> SaveDone model.version)
       |> Effects.task
@@ -453,6 +450,6 @@ load model =
           Err err -> 
             NoAction
   in 
-    Native.ImageAnnotation.load "state"
+    Storage.load "state"
       |> Task.map decodeLoadResult
       |> Effects.task
